@@ -8,6 +8,9 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 import javax.swing.JTable;
 import javax.swing.table.DefaultTableModel;
 
@@ -131,9 +134,34 @@ public class Tokens {
     private boolean esEstadoFinal(int estado) {
         return expresiones[estado] != null && !expresiones[estado].isEmpty();
     }
+    Set<String> palabrasReservadas = new HashSet<>(Arrays.asList(
+            // Palabras clave de ECMAScript
+            "await", "break", "case", "catch", "class", "const", "continue", "debugger",
+            "default", "delete", "do", "else", "export", "extends", "false", "finally",
+            "for", "function", "if", "import", "in", "instanceof", "new", "null",
+            "return", "super", "switch", "this", "throw", "true", "try", "typeof",
+            "var", "void", "while", "with", "yield",
+            // Palabras reservadas en modo estricto
+            "let", "static",
+            // Palabras reservadas futuras
+            "enum", "implements", "interface", "package", "private", "protected", "public",
+            // Palabras reservadas heredadas (no se deben usar como identificadores)
+            "abstract", "boolean", "byte", "char", "double", "final", "float", "goto",
+            "int", "long", "native", "short", "synchronized", "throws", "transient", "volatile",
+            // Identificadores especiales en Node.js
+            "require", "module", "exports", "global", "__dirname", "__filename", "process",
+            "Buffer", "setImmediate", "setTimeout", "setInterval"
+    ));
 
     private void agregarToken(int estado, String lexema, int linea) {
-        String tipo = expresiones[estado]; // p.ej., "ID", "NUM", "BOOL", etc.
+        String tipo;
+
+        if (palabrasReservadas.contains(lexema)) {
+            tipo = "PR"; // Palabra Reservada
+        } else {
+            tipo = expresiones[estado]; // Usar el tipo definido por el estado
+        }
+
         ((DefaultTableModel) tblTokens.getModel()).addRow(new Object[]{tipo, lexema, linea});
         actualizarContador(tipo);
     }
@@ -180,79 +208,79 @@ public class Tokens {
     }
 
     private int getColumna(char c) {
-        // Este método depende de cómo tengas configuradas las columnas en tu matriz.
-        // A continuación te muestro un ejemplo base, tú debes ajustarlo según tus símbolos.
-
-        if (Character.isLetter(c)) {
-            return 24; // Supongamos columna 0 es para letras
-        } else if (Character.isDigit(c)) {
-            return 25; // Supongamos columna 1 es para dígitos
-        } else {
-            switch (c) {
-                case '+':
-                    return 0;
-                case '-':
-                    return 1;
-                case '*':
-                    return 2;
-                case '<':
-                    return 3;
-                case '>':
-                    return 4;
-                case '=':
-                    return 5;
-                case '!':
-                    return 6;
-                case '&':
-                    return 7;
-                case '|':
-                    return 8;
-                case '%':
-                    return 9;
-                case '^':
-                    return 10;
-                case '~':
-                    return 11;
-                case ',':
-                    return 12;
-                case '.':
-                    return 13;
-                case ';':
-                    return 14;
-                case ':':
-                    return 15;
-                case '?':
-                    return 16;
-                case '[':
-                    return 17;
-                case ']':
-                    return 18;
-                case '{':
-                    return 19;
-                case '}':
-                    return 20;
-                case '(':
-                    return 21;
-                case ')':
-                    return 22;
-                case '@':
-                    return 23;
-                case '/':
-                    return 26;
-                case '_':
-                    return 27;
-                case '"':
-                    return 28;
-                case '#':
-                    return 29;
-                case '$':
-                    return 30;
-                case '\n':
-                    return 31;
-
-                default:
-                    return -1; // Carácter inválido
-            }
+        switch (c) {
+            case '+':
+                return 0;
+            case '-':
+                return 1;
+            case '*':
+                return 2;
+            case '<':
+                return 3;
+            case '>':
+                return 4;
+            case '=':
+                return 5;
+            case '!':
+                return 6;
+            case '&':
+                return 7;
+            case '|':
+                return 8;
+            case '%':
+                return 9;
+            case '^':
+                return 10;
+            case '~':
+                return 11;
+            case ',':
+                return 12;
+            case '.':
+                return 13;
+            case ';':
+                return 14;
+            case ':':
+                return 15;
+            case '?':
+                return 16;
+            case '[':
+                return 17;
+            case ']':
+                return 18;
+            case '{':
+                return 19;
+            case '}':
+                return 20;
+            case '(':
+                return 21;
+            case ')':
+                return 22;
+            case '@':
+                return 23;
+            case '/':
+                return 26;
+            case '_':
+                return 27;
+            case '"':
+                return 28;
+            case '\'':
+                return 29;
+            case '#':
+                return 30;
+            case '$':
+                return 31;
+            case '\n':
+                return 32;
+            default:
+                if (Character.isLetter(c)) {
+                    return 24; // Letras [a-zA-Z]
+                } else if (Character.isDigit(c)) {
+                    return 25; // Dígitos [0-9]
+                } else if (c != '*') {
+                    return 33; // Cualquier cosa que no sea *
+                } else {
+                    return 34; // "oc" o cualquier otro caracter especial (depende de tu lógica)
+                }
         }
     }
 
