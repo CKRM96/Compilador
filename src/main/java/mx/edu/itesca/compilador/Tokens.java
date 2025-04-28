@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package mx.edu.itesca.compilador;
 
 import java.io.BufferedReader;
@@ -14,16 +10,11 @@ import java.util.Set;
 import javax.swing.JTable;
 import javax.swing.table.DefaultTableModel;
 
-/**
- *
- * @author diego
- */
 public class Tokens {
-
     int[][] matriz;
     File archivo;
     JTable tblTokens, tblErrores, tblContadores;
-    String expresiones[];
+    String[] expresiones;
 
     public Tokens(int[][] matriz, File archivo, JTable tblTokens, JTable tblErrores, JTable tblContadores, String[] expresiones) {
         this.matriz = matriz;
@@ -32,18 +23,10 @@ public class Tokens {
         this.tblErrores = tblErrores;
         this.tblContadores = tblContadores;
         this.expresiones = expresiones;
-        CompilarMatriz();
+        compilarMatriz();
     }
 
-    public void CompilarMatriz() {
-        //aqui se deben crear las funciones para leer los tokens
-
-        //si el dato ya pasa los 500 ya es un error
-        //si el caracter es un salto de linea, se aumenta la linea (++) y se reincia la columna
-        //el espacio y enter tambien cuentan pero no se tokenizan
-        //cambia de estado [q's] y se le añade el caracter al lexema
-        //si no es token ni es error el lexema aumenta, se pasa al siguiente caracter
-        //si lex == palabra reservada se regresa el valor del token
+    private void compilarMatriz() {
         int estadoActual = 0;
         StringBuilder lexema = new StringBuilder();
         int linea = 1;
@@ -53,30 +36,25 @@ public class Tokens {
             while ((caracter = br.read()) != -1) {
                 char c = (char) caracter;
 
-                // Detectar saltos de línea
+                // Salto de línea
                 if (c == '\n') {
                     linea++;
                     continue;
                 }
 
-                // Ignorar espacios y tabulaciones si no son parte del léxico
+                // Espacios y tabulaciones: tokenizar si hay algo acumulado
                 if (Character.isWhitespace(c)) {
-                    // Si hay algo en el lexema, revisar si es estado final antes de limpiar
-                    if (lexema.length() > 0 && esEstadoFinal(estadoActual)) {
-                        agregarToken(estadoActual, lexema.toString(), linea);
-                    } else if (lexema.length() > 0) {
-                        agregarError("Token no reconocido", lexema.toString(), linea);
+                    if (lexema.length() > 0) {
+                        finalizarLexema(estadoActual, lexema.toString(), linea);
+                        estadoActual = 0;
+                        lexema.setLength(0);
                     }
-
-                    estadoActual = 0;
-                    lexema.setLength(0);
                     continue;
                 }
 
                 int columnaMatriz = getColumna(c);
 
                 if (columnaMatriz == -1) {
-                    // Si no pertenece a ningún símbolo válido
                     if (lexema.length() > 0) {
                         agregarError("Token no reconocido", lexema.toString(), linea);
                         lexema.setLength(0);
@@ -88,42 +66,31 @@ public class Tokens {
 
                 int nuevoEstado = matriz[estadoActual][columnaMatriz];
 
-                if (nuevoEstado == -1) {
-                    if (esEstadoFinal(estadoActual)) {
-                        agregarToken(estadoActual, lexema.toString(), linea);
-                    } else {
-                        agregarError("Token no reconocido", lexema.toString(), linea);
-                    }
-
-                    // Reiniciar y reintentar desde el nuevo carácter
+                if (nuevoEstado >= 500) {
+                    // Error léxico detectado
+                    agregarError("Error léxico", lexema.toString() + c, linea);
                     estadoActual = 0;
                     lexema.setLength(0);
-
-                    // Reintentar este carácter desde estado 0
-                    columnaMatriz = getColumna(c);
-                    nuevoEstado = matriz[estadoActual][columnaMatriz];
-
-                    if (nuevoEstado != -1) {
-                        estadoActual = nuevoEstado;
-                        lexema.append(c);
-                    } else {
-                        agregarError("Carácter inválido", Character.toString(c), linea);
-                        estadoActual = 0;
-                    }
-
-                } else {
-                    estadoActual = nuevoEstado;
-                    lexema.append(c);
+                    continue;
                 }
+
+                if (nuevoEstado < 0) {
+                    // Estado final (token reconocido)
+                    lexema.append(c);
+                    agregarTokenFinal(nuevoEstado, lexema.toString(), linea);
+                    estadoActual = 0;
+                    lexema.setLength(0);
+                    continue;
+                }
+
+                // Avance normal
+                estadoActual = nuevoEstado;
+                lexema.append(c);
             }
 
-            // Si hay un lexema pendiente al final del archivo
+            // Revisar lexema pendiente al final
             if (lexema.length() > 0) {
-                if (esEstadoFinal(estadoActual)) {
-                    agregarToken(estadoActual, lexema.toString(), linea);
-                } else {
-                    agregarError("Token no reconocido", lexema.toString(), linea);
-                }
+                finalizarLexema(estadoActual, lexema.toString(), linea);
             }
 
         } catch (IOException e) {
@@ -131,41 +98,76 @@ public class Tokens {
         }
     }
 
-    private boolean esEstadoFinal(int estado) {
-        return expresiones[estado] != null && !expresiones[estado].isEmpty();
-    }
-    Set<String> palabrasReservadas = new HashSet<>(Arrays.asList(
-            // Palabras clave de ECMAScript
-            "await", "break", "case", "catch", "class", "const", "continue", "debugger",
-            "default", "delete", "do", "else", "export", "extends", "false", "finally",
-            "for", "function", "if", "import", "in", "instanceof", "new", "null",
-            "return", "super", "switch", "this", "throw", "true", "try", "typeof",
-            "var", "void", "while", "with", "yield",
-            // Palabras reservadas en modo estricto
-            "let", "static",
-            // Palabras reservadas futuras
-            "enum", "implements", "interface", "package", "private", "protected", "public",
-            // Palabras reservadas heredadas (no se deben usar como identificadores)
-            "abstract", "boolean", "byte", "char", "double", "final", "float", "goto",
-            "int", "long", "native", "short", "synchronized", "throws", "transient", "volatile",
-            // Identificadores especiales en Node.js
-            "require", "module", "exports", "global", "__dirname", "__filename", "process",
-            "Buffer", "setImmediate", "setTimeout", "setInterval"
-    ));
-
-    private void agregarToken(int estado, String lexema, int linea) {
-        String tipo;
-
-        if (palabrasReservadas.contains(lexema)) {
-            tipo = "PR"; // Palabra Reservada
+    private void finalizarLexema(int estadoActual, String lexema, int linea) {
+        if (esEstadoFinal(estadoActual)) {
+            agregarToken(estadoActual, lexema, linea);
         } else {
-            tipo = expresiones[estado]; // Usar el tipo definido por el estado
+            agregarError("Token no reconocido", lexema, linea);
         }
-
-        ((DefaultTableModel) tblTokens.getModel()).addRow(new Object[]{tipo, lexema, linea});
-        actualizarContador(tipo);
     }
 
+    private boolean esEstadoFinal(int estado) {
+        return estado >= 0 && estado < expresiones.length && expresiones[estado] != null && !expresiones[estado].isEmpty();
+    }
+
+    
+    private void agregarToken(int estado, String lexema, int linea) {
+    String tipo = palabrasReservadas.contains(lexema) ? "PR" : expresiones[estado];
+
+    // NUEVO: Identificar tipo más específico
+    tipo = clasificarToken(tipo, lexema);
+
+    ((DefaultTableModel) tblTokens.getModel()).addRow(new Object[]{tipo, lexema, linea});
+    actualizarContador(tipo);
+}
+private String clasificarToken(String tipoBase, String lexema) {
+    if (tipoBase.equals("Operador")) {
+        if (lexema.equals("++") || lexema.equals("--")) {
+            return "Operador Postfix";
+        } else if (lexema.equals("&&") || lexema.equals("||")) {
+            return "Operador Lógico Binario";
+        } else if (lexema.equals("**")) {
+            return "Operador Exponente";
+        } else if (lexema.equals("<<") || lexema.equals(">>") || lexema.equals(">>>")) {
+            return "Operador de Turno";
+        } else if (lexema.equals("?")) {
+            return "Operador Ternario";
+        } else if (lexema.equals("=") || lexema.equals("+=") || lexema.equals("-=") || lexema.equals("*=") || lexema.equals("/=") || lexema.equals("%=")) {
+            return "Operador de Asignación";
+        } else if (lexema.equals("(") || lexema.equals(")") || lexema.equals("{") || lexema.equals("}") || lexema.equals("[") || lexema.equals("]")) {
+            return "Operador de Agrupamiento";
+        } else if (lexema.equals("===") || lexema.equals("!==")) {
+            return "Operador de Conversión sin Igualdad";
+        }
+    } else if (tipoBase.equals("Constante")) {
+        if (lexema.matches("\".*\"")) {
+            return "Constante de Cadena";
+        } else if (lexema.matches("\\d+")) {
+            return "Constante Numérica";
+        } else if (lexema.matches("\\d+\\.\\d+")) {
+            return "Constante Real";
+        } else if (lexema.matches("\\d+(\\.\\d+)?[eE][-+]?\\d+")) {
+            return "Constante Exponencial";
+        }
+    } else if (tipoBase.equals("Identificador")) {
+        if (lexema.equals("true") || lexema.equals("false")) {
+            return "Constante Booleana";
+        } else if (lexema.equals("null")) {
+            return "Constante Nula";
+        }
+    }
+    return tipoBase; // No cambiar si no aplica
+}
+private void agregarTokenFinal(int estadoFinal, String lexema, int linea) {
+    String tipo = obtenerNombreToken(estadoFinal);
+
+    // NUEVO: Identificar tipo más específico
+    tipo = clasificarToken(tipo, lexema);
+
+    ((DefaultTableModel) tblTokens.getModel()).addRow(new Object[]{tipo, lexema, linea});
+    actualizarContador(tipo);
+}
+    
     private void agregarError(String descripcion, String lexema, int linea) {
         ((DefaultTableModel) tblErrores.getModel()).addRow(new Object[]{
             "ERROR", descripcion, lexema, "Léxico", linea, "-"
@@ -184,111 +186,65 @@ public class Tokens {
         }
     }
 
-    private int getIndiceColumna(char c) {
-        // Este método depende de cómo tengas definidas tus columnas en expresiones[]
-        for (int i = 0; i < expresiones.length; i++) {
-            if (expresiones[i].equals(String.valueOf(c))) {
-                return i;
-            }
-        }
-        return -1; // Carácter no válido
-    }
-
-    private void registrarToken(int estadoFinal, String lexema, int linea) {
-        String tipo = obtenerNombreToken(estadoFinal); // p. ej. "IDENTIFICADOR", "NUM"
-        ((DefaultTableModel) tblTokens.getModel()).addRow(new Object[]{tipo, lexema, linea});
-        actualizarContador(tipo);
-    }
-
-    private void registrarError(String descripcion, String lexema, int linea, int columna) {
-        ((DefaultTableModel) tblErrores.getModel()).addRow(new Object[]{
-            "ERROR", descripcion, lexema, "Léxico", linea, columna
-        });
-        actualizarContador("Errores");
-    }
-
-    private int getColumna(char c) {
-        switch (c) {
-            case '+':
-                return 0;
-            case '-':
-                return 1;
-            case '*':
-                return 2;
-            case '<':
-                return 3;
-            case '>':
-                return 4;
-            case '=':
-                return 5;
-            case '!':
-                return 6;
-            case '&':
-                return 7;
-            case '|':
-                return 8;
-            case '%':
-                return 9;
-            case '^':
-                return 10;
-            case '~':
-                return 11;
-            case ',':
-                return 12;
-            case '.':
-                return 13;
-            case ';':
-                return 14;
-            case ':':
-                return 15;
-            case '?':
-                return 16;
-            case '[':
-                return 17;
-            case ']':
-                return 18;
-            case '{':
-                return 19;
-            case '}':
-                return 20;
-            case '(':
-                return 21;
-            case ')':
-                return 22;
-            case '@':
-                return 23;
-            case '/':
-                return 26;
-            case '_':
-                return 27;
-            case '"':
-                return 28;
-            case '\'':
-                return 29;
-            case '#':
-                return 30;
-            case '$':
-                return 31;
-            case '\n':
-                return 32;
-            default:
-                if (Character.isLetter(c)) {
-                    return 24; // Letras [a-zA-Z]
-                } else if (Character.isDigit(c)) {
-                    return 25; // Dígitos [0-9]
-                } else if (c != '*') {
-                    return 33; // Cualquier cosa que no sea *
-                } else {
-                    return 34; // "oc" o cualquier otro caracter especial (depende de tu lógica)
-                }
-        }
-    }
-
     private String obtenerNombreToken(int estadoFinal) {
-        if (estadoFinal >= 0 && estadoFinal < expresiones.length) {
-            return expresiones[estadoFinal] != null ? expresiones[estadoFinal] : "Desconocido";
+        int indice = -estadoFinal; // Estado final es negativo
+        if (indice >= 0 && indice < expresiones.length) {
+            return expresiones[indice] != null ? expresiones[indice] : "Desconocido";
         }
         return "Desconocido";
     }
 
+    private int getColumna(char c) {
+        switch (c) {
+            case '+': return 1;
+            case '-': return 2;
+            case '*': return 3;
+            case '<': return 4;
+            case '>': return 5;
+            case '=': return 6;
+            case '!': return 7;
+            case '&': return 8;
+            case '|': return 9;
+            case '%': return 10;
+            case '^': return 11;
+            case '~': return 12;
+            case ',': return 13;
+            case '.': return 14;
+            case ';': return 15;
+            case ':': return 16;
+            case '?': return 17;
+            case '[': return 18;
+            case ']': return 19;
+            case '{': return 20;
+            case '}': return 21;
+            case '(': return 22;
+            case ')': return 23;
+            case '@': return 26;
+            case '/': return 27;
+            case '_': return 28;
+            case '"': return 29;
+            case '\'': return 30;
+            case '#': return 31;
+            case '$': return 32;
+            case '\n': return 33;
+            default:
+                if (Character.isLetter(c)) return 24;  // Letras [a-zA-Z]
+                if (Character.isDigit(c)) return 25;   // Dígitos [0-9]
+                if (c != '*') return 34;               // [^*] = cualquier cosa que no sea '*'
+                return 35;                             // oc = otro carácter
+        }
+    }
+
+    Set<String> palabrasReservadas = new HashSet<>(Arrays.asList(
+        "await", "break", "case", "catch", "class", "const", "continue", "debugger",
+        "default", "delete", "do", "else", "export", "extends", "false", "finally",
+        "for", "function", "if", "import", "in", "instanceof", "new", "null",
+        "return", "super", "switch", "this", "throw", "true", "try", "typeof",
+        "var", "void", "while", "with", "yield", "let", "static", "enum",
+        "implements", "interface", "package", "private", "protected", "public",
+        "abstract", "boolean", "byte", "char", "double", "final", "float", "goto",
+        "int", "long", "native", "short", "synchronized", "throws", "transient",
+        "volatile", "require", "module", "exports", "global", "__dirname",
+        "__filename", "process", "Buffer", "setImmediate", "setTimeout", "setInterval"
+    ));
 }
