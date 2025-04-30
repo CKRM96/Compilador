@@ -6,10 +6,19 @@ package mx.edu.itesca.compilador;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
 import javax.swing.JFileChooser;
+import javax.swing.table.DefaultTableModel;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 /**
  *
@@ -23,11 +32,34 @@ public class Interfaz extends javax.swing.JFrame {
     public Interfaz() {
 
         initComponents();
-        btnCompilar.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                btnCompilarActionPerformed(evt);
+
+    }
+
+    private void writeTableToSheet(javax.swing.JTable table, Sheet sheet) {
+        int rowCount = table.getRowCount();
+        int colCount = table.getColumnCount();
+
+        // Limpia contenido anterior (opcional, si no quieres sobrescribir puedes omitir esto)
+        for (int i = sheet.getLastRowNum(); i >= 0; i--) {
+            sheet.removeRow(sheet.getRow(i));
+        }
+
+        // Agregar encabezados
+        Row headerRow = sheet.createRow(0);
+        for (int c = 0; c < colCount; c++) {
+            Cell cell = headerRow.createCell(c);
+            cell.setCellValue(table.getColumnName(c));
+        }
+
+        // Agregar filas
+        for (int r = 0; r < rowCount; r++) {
+            Row row = sheet.createRow(r + 1);
+            for (int c = 0; c < colCount; c++) {
+                Cell cell = row.createCell(c);
+                Object value = table.getValueAt(r, c);
+                cell.setCellValue(value != null ? value.toString() : "");
             }
-        });
+        }
     }
 
     /**
@@ -52,6 +84,7 @@ public class Interfaz extends javax.swing.JFrame {
         jLabel2 = new javax.swing.JLabel();
         jScrollPane4 = new javax.swing.JScrollPane();
         jTable3 = new javax.swing.JTable();
+        jLabel3 = new javax.swing.JLabel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
 
@@ -82,10 +115,7 @@ public class Interfaz extends javax.swing.JFrame {
 
         jTable1.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
-                {null, null, null},
-                {null, null, null},
-                {null, null, null},
-                {null, null, null}
+
             },
             new String [] {
                 "Token", "Lexema", "Línea"
@@ -110,10 +140,7 @@ public class Interfaz extends javax.swing.JFrame {
 
         jTable2.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
-                {null, null, null, null, null, null},
-                {null, null, null, null, null, null},
-                {null, null, null, null, null, null},
-                {null, null, null, null, null, null}
+
             },
             new String [] {
                 "Token", "Descripción", "Lexema", "Tipo de error", "Linea", "Columna"
@@ -154,12 +181,14 @@ public class Interfaz extends javax.swing.JFrame {
         ));
         jScrollPane4.setViewportView(jTable3);
 
+        jLabel3.setText("Tokens");
+
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
-                .addContainerGap(42, Short.MAX_VALUE)
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(jScrollPane4, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addComponent(jLabel2)
@@ -178,7 +207,8 @@ public class Interfaz extends javax.swing.JFrame {
                                         .addComponent(btnCompilar)
                                         .addGap(47, 47, 47)
                                         .addComponent(btnGEXcel, javax.swing.GroupLayout.PREFERRED_SIZE, 92, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                        .addGap(28, 28, 28)))))))
+                                        .addGap(28, 28, 28))
+                                    .addComponent(jLabel3))))))
                 .addGap(24, 24, 24))
         );
         layout.setVerticalGroup(
@@ -191,7 +221,9 @@ public class Interfaz extends javax.swing.JFrame {
                             .addComponent(btnCargar)
                             .addComponent(btnCompilar)
                             .addComponent(btnGEXcel))
-                        .addGap(38, 38, 38)
+                        .addGap(16, 16, 16)
+                        .addComponent(jLabel3)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, 269, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addGap(30, 30, 30))
                     .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
@@ -212,7 +244,55 @@ public class Interfaz extends javax.swing.JFrame {
     }// </editor-fold>//GEN-END:initComponents
 
     private void btnGEXcelActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnGEXcelActionPerformed
-        // TODO add your handling code here:
+        try {
+            // Cargar plantilla con FileInputStream (ruta relativa desde raíz del proyecto)
+
+            InputStream is = getClass().getResourceAsStream("/Excel/Plantilla de lexico 2024-1.xlsx");
+            if (is == null) {
+                throw new FileNotFoundException("No se encontró la plantilla en los recursos.");
+            }
+            Workbook workbook = new XSSFWorkbook(is);
+            // Acceder a hojas por nombre
+            Sheet sheetTokens = workbook.getSheet("TOKENS");
+            Sheet sheetErrores = workbook.getSheet("Errores");
+            Sheet sheetContadores = workbook.getSheet("CONTADORES");
+
+            if (sheetTokens == null || sheetErrores == null || sheetContadores == null) {
+                throw new IllegalArgumentException("Una o más hojas no existen en la plantilla.");
+            }
+
+            // Escribir datos desde jTable1 (TOKENS)
+            writeTableToSheet(jTable1, sheetTokens);
+
+            // Escribir datos desde jTable2 (Errores)
+            writeTableToSheet(jTable2, sheetErrores);
+
+            // Escribir datos desde jTable3 (Contadores)
+            writeTableToSheet(jTable3, sheetContadores);
+
+            // Guardar como nuevo archivo
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setDialogTitle("Guardar Excel generado");
+            int seleccion = fileChooser.showSaveDialog(this);
+
+            if (seleccion == JFileChooser.APPROVE_OPTION) {
+                File archivoDestino = fileChooser.getSelectedFile();
+                if (!archivoDestino.getName().endsWith(".xlsx")) {
+                    archivoDestino = new File(archivoDestino.getAbsolutePath() + ".xlsx");
+                }
+
+                FileOutputStream fos = new FileOutputStream(archivoDestino);
+                workbook.write(fos);
+                fos.close();
+                workbook.close();
+
+                javax.swing.JOptionPane.showMessageDialog(this, "Archivo Excel generado exitosamente.");
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            javax.swing.JOptionPane.showMessageDialog(this, "Error al generar Excel: " + e.getMessage());
+        }
     }//GEN-LAST:event_btnGEXcelActionPerformed
     File archivo;
     private void btnCargarActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnCargarActionPerformed
@@ -294,6 +374,7 @@ public class Interfaz extends javax.swing.JFrame {
     private javax.swing.JButton btnGEXcel;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
+    private javax.swing.JLabel jLabel3;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JScrollPane jScrollPane2;
     private javax.swing.JScrollPane jScrollPane3;
